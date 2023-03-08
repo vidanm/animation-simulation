@@ -10,15 +10,15 @@
 #define FE 100
 #define H (1./FE) /* Pas d'échantillonnage */
 
-#define NBM 10
-#define NBL 9
+#define NBM 20
+#define NBL 19
 
 typedef struct _pmat_ 
 {
 	double m; /* Masse */
 	Vector2 pos; /* Position */
-	double vit; /* Vitesse */
-	double frc; /* Accumulateur de force */
+	Vector2 vit; /* Vitesse */
+	Vector2 frc; /* Accumulateur de force */
 	void (*setup)(struct _pmat_ *, double h); /* Intégrateur */
 } _pmat_;
 
@@ -36,16 +36,21 @@ _link_ L_gravite;
 
 void gravite(struct _link_ * L){
 	for (int i=0;i<NBM;i++){
-		TabM[i].frc += L->f;
+		TabM[i].frc.y += L->f;
 	}
 }
 
 void setup_frein(struct _link_ *L)
 {
-	double f;
-	f = -(L->z) * (L->M2->vit - L->M1->vit);
-	L->M1->frc += f;
-	L->M2->frc -= f;
+	Vector2 f;
+	f.x = -(L->z) * (L->M2->vit.x - L->M1->vit.x);
+	f.y = -(L->z) * (L->M2->vit.y - L->M1->vit.y);
+	
+	L->M1->frc.x += f.x;
+	L->M1->frc.y += f.y;
+
+	L->M2->frc.x -= f.x;
+	L->M2->frc.y += f.y;
 }
 
 void setup_ressort(struct _link_ *L){
@@ -59,26 +64,39 @@ void setup_ressort(struct _link_ *L){
 				((x2-x1)*(x2-x1))+((y2-y1)*(y2-y1))
 	);
 
-	longueur_courante = y2 - y1;
+	//longueur_courante = y2 - y1;
 
-	f = L->k * (longueur_courante) - L->l0;
-	L->M1->frc += f;
-	L->M2->frc -= f;
+	f = L->k * ((longueur_courante) - L->l0);
+
+	Vector2 dir;
+	dir.x = x2-x1;
+	dir.y = y2-y1;
+
+	L->M1->frc.y += f * dir.y;
+	L->M2->frc.y -= f * dir.y;
+	L->M1->frc.x += f * dir.x;
+	L->M2->frc.x -= f * dir.x;
 
 	setup_frein(L);
 }
 
 void setup_particule(struct _pmat_ *M,double h)
 {
-	M->vit = M->vit+(M->frc/M->m)*h;
-	//M->pos.x += M->vit *h;
-	M->pos.y += M->vit *h;
-	M->frc = 0;
+	//M->vit = M->vit+(M->frc/M->m)*h;
+	M->vit.x = M->vit.x + (M->frc.x/M->m)*h;
+	M->vit.y = M->vit.y + (M->frc.y/M->m)*h;
+
+	M->pos.x += M->vit.x *h;
+	M->pos.y += M->vit.y *h;
+
+	M->frc.x = 0;
+	M->frc.y = 0;
 }
 
 void setup_point_fixe(struct _pmat_ *M,double h)
 {
-	M->frc = 0;
+	M->frc.x = 0;
+	M->frc.y = 0;
 }
 
 void moteur_physique(void){
@@ -102,11 +120,13 @@ int main(void)
 	L_gravite.f = 0;
 
 	for (int i=0;i<NBM;i++){
-		TabM[i].m = rand()%200;//100;//400;//rand()%200;
-		TabM[i].pos.x = 50+(i*50);
+		TabM[i].m = 50+(rand()%200);
+		TabM[i].pos.x = 10+(800/NBM)*i;
 		TabM[i].pos.y = 225;
-		TabM[i].vit = 0;
-		TabM[i].frc = 0;
+		TabM[i].vit.x = 0;
+		TabM[i].vit.y = 0;
+		TabM[i].frc.x = 0;
+		TabM[i].frc.y = 0;
 
 		if (i ==0 || i == NBM -1)
 			TabM[i].setup = setup_point_fixe;
@@ -123,8 +143,8 @@ int main(void)
 		TabL[i].setup = setup_ressort;
 	}
 
+
     InitWindow(800, 450, "raylib [core] example - basic window");
-	
     while (!WindowShouldClose())
     {
         BeginDrawing();
